@@ -11,6 +11,9 @@ const {
   filterSchema
 } = require("../validators/product.validate");
 //Route public
+const catalogAdmin = (req, res, next) => { res.locals.catalogAdmin = true; next(); };
+router.get("/admin", authMiddleware, adminMiddleware, catalogAdmin, productController.getProducts);
+router.get("/admin/:param", authMiddleware, adminMiddleware, catalogAdmin, productController.getProductByParam);
 router.get("/",validate(filterSchema),productController.getProducts);
 router.get("/category/:categoryId",productController.getProductsByCategory);
 router.get("/filters", productController.getFilters);

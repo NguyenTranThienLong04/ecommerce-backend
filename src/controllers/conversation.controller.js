@@ -8,7 +8,8 @@ exports.getOrCreateConversation = async (req, res) => {
     const userId = req.user.id;
 
     const existed = await ConversationUser.findOne({
-      idUser: userId
+      idUser: userId,
+      roleInConversation: "USER"
     }).populate("idConversation");
 
     if (existed) {
@@ -23,13 +24,7 @@ exports.getOrCreateConversation = async (req, res) => {
       roleInConversation: "USER"
     });
 
-    const adminId = process.env.ADMIN_ID;
-
-    await ConversationUser.create({
-      idConversation: conversation._id,
-      idUser: adminId,
-      roleInConversation: "ADMIN"
-    });
+    // Current DB admins are authorized by role; no hardcoded admin account ID.
 
     res.json(conversation);
 

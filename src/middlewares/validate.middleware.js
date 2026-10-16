@@ -25,7 +25,8 @@ module.exports = (schema) => {
 
     // ✅ Ghi đè lại dữ liệu đã được clean
     req.body = value.body || {};
-    req.query = value.query || {};
+    // Express 5 exposes query as a getter. Shadow it with the validated value.
+    Object.defineProperty(req, "query", { value: value.query || {}, writable: true, configurable: true, enumerable: true });
     req.params = value.params || {};
 
     next();

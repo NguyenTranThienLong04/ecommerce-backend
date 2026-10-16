@@ -1,35 +1,32 @@
 const Joi = require("joi");
+const { ORDER_STATUSES } = require("../utils/orderState");
 
 // 🧾 Tạo đơn hàng
+const objectId = Joi.string().hex().length(24).lowercase();
+const addressField = rule => rule.trim().when("addressId", {
+  is: Joi.exist(), then: Joi.optional(), otherwise: Joi.required()
+});
 const createOrderSchema = Joi.object({
   body: Joi.object({
-    receiverName: Joi.string().min(2).max(100).required(),
-
-    phone: Joi.string()
-      .pattern(/^[0-9]{9,11}$/)
-      .required()
-      .messages({
-        "string.pattern.base": "Số điện thoại không hợp lệ",
-      }),
-
-    addressLine: Joi.string().min(5).required(),
-    ward: Joi.string().required(),
-    district: Joi.string().required(),
-    city: Joi.string().required(),
-
-    shippingMethod: Joi.string()
-      .valid("COD", "VNPAY", "MOMO")
-      .required(),
-
-    shippingFee: Joi.number().min(0).default(0),
-  }),
+    idempotencyKey: Joi.string().pattern(/^[A-Za-z0-9_-]{16,128}$/).required(),
+    cartId: objectId.required(),
+    cartSnapshot: Joi.string().hex().length(64).lowercase().required(),
+    addressId: objectId.optional(),
+    receiverName: addressField(Joi.string().min(2).max(100)),
+    phone: addressField(Joi.string().pattern(/^[0-9]{9,11}$/)),
+    addressLine: addressField(Joi.string().min(5)),
+    ward: addressField(Joi.string()),
+    district: addressField(Joi.string()),
+    city: addressField(Joi.string()),
+    shippingMethod: Joi.string().valid("COD", "VNPAY").required()
+    // Client price/quantity/subtotal/total/shippingFee are discarded by validation.
+  }).required()
 });
 
-// 🔄 Update status (admin)
 const updateStatusSchema = Joi.object({
   body: Joi.object({
     status: Joi.string()
-      .valid("PENDING", "CONFIRMED", "SHIPPING", "DONE", "CANCEL")
+      .valid(...ORDER_STATUSES)
       .required(),
   }),
 

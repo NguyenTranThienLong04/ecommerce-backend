@@ -1,6 +1,11 @@
 const Product = require("../models/Product");
 const Order = require("../models/Order");
 const User = require("../models/User");
+const OrderItem = require("../models/OrderItem");
+const ProductVariant = require("../models/ProductVariant");
+
+// Revenue is collected order total (including shipping), only for completed paid orders.
+const revenueOrders = { status: "DONE", paymentStatus: "PAID", paymentReviewRequired: { $ne: true } };
 
 // ================= DASHBOARD =================
 exports.getDashboard = async (req, res) => {
@@ -17,12 +22,12 @@ exports.getDashboard = async (req, res) => {
       Order.countDocuments(),
 
       Order.aggregate([
-        { $match: { status: "DONE" } },
+        { $match: revenueOrders },
         {
           $group: {
             _id: null,
             totalRevenue: {
-              $sum: { $add: ["$total", "$shippingFee"] }
+              $sum: "$total"
             }
           }
         }
@@ -70,7 +75,7 @@ exports.getRevenueByDate = async (req, res) => {
   try {
     const { month, year } = req.query;
 
-    let match = { status: "DONE" };
+    let match = { ...revenueOrders };
 
     if (month && year) {
       match.createdAt = {
@@ -87,7 +92,7 @@ exports.getRevenueByDate = async (req, res) => {
             day: { $dayOfMonth: "$createdAt" }
           },
           revenue: {
-            $sum: { $add: ["$total", "$shippingFee"] }
+            $sum: "$total"
           }
         }
       },
@@ -109,17 +114,24 @@ exports.getRevenueByDate = async (req, res) => {
 // ================= TOP PRODUCTS =================
 exports.getTopProducts = async (req, res) => {
   try {
-    const data = await Order.aggregate([
-      { $match: { status: "DONE" } },
-      { $unwind: "$items" },
+    const data = await OrderItem.aggregate([
+      { $lookup: { from: Order.collection.name, localField: "idOrder", foreignField: "_id", as: "order" } },
+      { $unwind: "$order" },
+      { $match: { "order.status": revenueOrders.status, "order.paymentStatus": revenueOrders.paymentStatus,
+        "order.paymentReviewRequired": { $ne: true } } },
+      { $lookup: { from: ProductVariant.collection.name, localField: "idProductVariant", foreignField: "_id", as: "variant" } },
+      { $unwind: "$variant" },
       {
         $group: {
-          _id: "$items.productId",
-          totalSold: { $sum: "$items.quantity" }
+          _id: "$variant.idProduct",
+          totalSold: { $sum: "$quantity" },
+          revenue: { $sum: { $multiply: ["$price", "$quantity"] } }
         }
       },
-      { $sort: { totalSold: -1 } },
-      { $limit: 5 }
+      { $sort: { totalSold: -1, _id: 1 } },
+      { $limit: 5 },
+      { $lookup: { from: Product.collection.name, localField: "_id", foreignField: "_id", as: "product" } },
+      { $project: { totalSold: 1, revenue: 1, nameProduct: { $arrayElemAt: ["$product.nameProduct", 0] } } }
     ]);
 
     res.json(data);
@@ -132,7 +144,7 @@ exports.getTopProducts = async (req, res) => {
 exports.getTopUsers = async (req, res) => {
   try {
     const data = await Order.aggregate([
-      { $match: { status: "DONE" } },
+      { $match: revenueOrders },
       {
         $group: {
           _id: "$idUser",

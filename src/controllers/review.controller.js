@@ -1,93 +1,52 @@
-const Review=require("../models/Review");
-const Order=require("../models/Order");
-const OrderItem=require("../models/OrderItem");
+const Review = require("../models/Review");
+const Order = require("../models/Order");
+const OrderItem = require("../models/OrderItem");
+const ProductVariant = require("../models/ProductVariant");
+const ensureCatalogReady = require("../utils/catalogReady");
+const { catalogError } = require("../utils/catalog");
 
-//Create Review 
-async function createReview(req,res){
-    try{
-        const {idOrderItem,rating,comment}=req.body;
-
-        //Check orderitem
-        const orderItem=await OrderItem.findById(idOrderItem);
-        if(!orderItem){
-            res.status(404).json({ message: "Order item không tồn tại" });
-        }
-
-        // Check order done
-        const order=await Order.findById(orderItem.idOrder);
-        if(!order||order.status!=="DONE"){
-            res.status(400).json({message: "Đơn hàng chưa hoàn tất" });
-        }
-
-        //Check role user
-        if(order.idUser.toString()!==req.user._id.toString()){
-            return res.status(403).json({ message: "Không có quyền đánh giá" });
-        }
-        // Check nếu user đã review orderItem này
-const existingReview = await Review.findOne({ idOrderItem });
-if (existingReview) {
-  return res.status(400).json({ message: "Bạn đã đánh giá sản phẩm này rồi" });
-}
-        //Create review
-        const review=await Review.create({
-            idUser:req.user._id,
-            idProductVariant:orderItem.idProductVariant,
-            idOrderItem,
-            rating,
-            comment
-        });
-        res.status(201).json(review);
-    }
-    catch(error){
-        res.status(500).json({message:error.message});
-    }
-};
-
-//Get reviews by product variant
-async function getReviewsByVariant(req,res){
-    const reviews=await Review.find({
-        idProductVariant:req.params.idVariant,
-        status:"VISIBLE"
-    }).populate("idUser","name");
-      res.json(reviews);
-};
-//Update review user
-async function updateReview(req,res){
-try{
-const review=await Review.findById(req.params.id);
-if (!review) return res.status(404).json({ message: "Review không tồn tại" });
- // Chỉ user tạo review mới được sửa
-    if (review.idUser.toString() !== req.user._id.toString()) {
-      return res.status(403).json({ message: "Không có quyền sửa review" });
-    }
-//Cap nhat
-const {rating , comment}=req.body;
-review.rating=rating??review.rating;
-review.comment=comment ??review.comment;
-await review.save();
-res.json(review);
+async function createReview(req, res) {
+  try {
+    const { idOrderItem, rating, comment } = req.body;
+    const orderItem = await OrderItem.findById(idOrderItem);
+    if (!orderItem) return res.status(404).json({ message: "Order item không tồn tại" });
+    const order = await Order.findById(orderItem.idOrder);
+    if (!order) return res.status(404).json({ message: "Đơn hàng không tồn tại" });
+    if (String(order.idUser) !== String(req.user._id)) return res.status(403).json({ message: "Không có quyền đánh giá" });
+    if (order.status !== "DONE") return res.status(400).json({ message: "Đơn hàng chưa hoàn tất" });
+    // DONE is terminal. Archived variants remain reviewable; broken legacy references do not create new orphans.
+    const variant = await ProductVariant.findById(orderItem.idProductVariant).populate("idProduct");
+    if (!variant?.idProduct) return res.status(409).json({ message: "Dữ liệu sản phẩm của đơn hàng không còn đầy đủ" });
+    await ensureCatalogReady();
+    const review = await Review.create({ idUser: req.user._id, idProductVariant: variant._id, idOrderItem, rating, comment });
+    res.status(201).json(review);
+  } catch (error) {
+    if (error.code === 11000) return res.status(409).json({ code: "REVIEW_EXISTS", message: "Bạn đã đánh giá sản phẩm này rồi" });
+    catalogError(res, error);
+  }
 }
 
-catch(error){
-    res.status(500).json({ message: error.message });
+async function getReviewsByVariant(req, res) {
+  const reviews = await Review.find({ idProductVariant: req.params.idVariant, status: "VISIBLE" }).populate("idUser", "name");
+  res.json(reviews);
 }
-};
 
-async function updateReviewStatus(req, res) {
+async function updateReview(req, res) {
   try {
     const review = await Review.findById(req.params.id);
     if (!review) return res.status(404).json({ message: "Review không tồn tại" });
+    if (String(review.idUser) !== String(req.user._id)) return res.status(403).json({ message: "Không có quyền sửa review" });
+    const fields = Object.fromEntries(["rating", "comment"].filter(key => Object.hasOwn(req.body, key)).map(key => [key, req.body[key]]));
+    res.json(await Review.findByIdAndUpdate(review._id, { $set: fields }, { returnDocument: "after", runValidators: true }));
+  } catch (error) { catalogError(res, error); }
+}
 
-    // Chỉ admin mới được chỉnh status
-    if (req.user.role !== "ADMIN") {
-      return res.status(403).json({ message: "Không có quyền" });
-    }
-
-    review.status = req.body.status; // VISIBLE / HIDDEN
-    await review.save();
+async function updateReviewStatus(req, res) {
+  try {
+    if (req.user.role !== "ADMIN") return res.status(403).json({ message: "Không có quyền" });
+    const review = await Review.findByIdAndUpdate(req.params.id, { $set: { status: req.body.status } }, { returnDocument: "after", runValidators: true });
+    if (!review) return res.status(404).json({ message: "Review không tồn tại" });
     res.json(review);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
-module.exports={createReview,getReviewsByVariant,updateReview,updateReviewStatus};  
+  } catch (error) { catalogError(res, error); }
+}
+module.exports = { createReview, getReviewsByVariant, updateReview, updateReviewStatus };

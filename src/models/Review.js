@@ -16,7 +16,9 @@ const reviewSchema = new mongoose.Schema({
   rating: {
     type: Number,
     min: 1,
-    max: 5
+    max: 5,
+    required: true,
+    validate: Number.isInteger
   },
   comment: String,
   status: {
@@ -25,5 +27,8 @@ const reviewSchema = new mongoose.Schema({
     default: "VISIBLE"
   }
 }, { timestamps: true });
+
+reviewSchema.index({ idOrderItem: 1 }, { unique: true, name: "review_order_item_unique",
+  partialFilterExpression: { idOrderItem: { $type: "objectId" } } });
 
 module.exports = mongoose.model("Review", reviewSchema);

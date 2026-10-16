@@ -1,2 +1,14 @@
 node_modules/
 .env
+.env.*
+!.env.example
+.cache/
+coverage/
+playwright-report/
+test-results/
+*.log
+*.pem
+*.key
+.vscode/
+.idea/
+.DS_Store

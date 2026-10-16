@@ -71,7 +71,7 @@ router.put("/:id",authMiddleware,adminMiddleware, async (req, res) => {
         order: req.body.order,
         status: req.body.status
       },
-      { new: true }
+      { returnDocument: "after" }
     );
 
     res.json(banner);

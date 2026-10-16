@@ -1,0 +1,88 @@
+name: Release checks
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      companion_ref:
+        description: Compatible companion branch, tag or SHA
+        required: false
+        type: string
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: ClothingShopProject
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/checkout@v7
+        with:
+          repository: long123123213/ecommerce-frontend
+          ref: ${{ inputs.companion_ref || vars.FRONTEND_REF || 'main' }}
+          path: ClothingShopProjectFE
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.13.1
+          cache: npm
+          cache-dependency-path: |
+            ClothingShopProject/package-lock.json
+            ClothingShopProjectFE/package-lock.json
+      - uses: actions/cache@v4
+        with:
+          path: ClothingShopProject/.cache/mongodb
+          key: mongo-${{ runner.os }}-${{ runner.arch }}-7.0.24
+      - name: Clean install
+        run: |
+          npm ci --prefix ClothingShopProject
+          npm ci --prefix ClothingShopProjectFE
+      - name: Syntax, secret scan and dependency audit
+        run: |
+          npm --prefix ClothingShopProject run check
+          npm --prefix ClothingShopProjectFE run check
+          npm --prefix ClothingShopProject run scan:secrets
+          npm --prefix ClothingShopProjectFE run scan:secrets
+          npm --prefix ClothingShopProject audit --audit-level=high
+          npm --prefix ClothingShopProjectFE audit --audit-level=high
+      - name: Unit, integration and concurrency regression
+        run: |
+          npm test --prefix ClothingShopProject
+          npm test --prefix ClothingShopProjectFE
+      - name: Install Chromium
+        working-directory: ClothingShopProjectFE
+        run: npx playwright install --with-deps chromium
+      - name: Browser E2E against real local services
+        working-directory: ClothingShopProjectFE
+        run: npm run test:e2e
+      - name: Docker build, startup and idempotent demo seed
+        working-directory: ClothingShopProject
+        run: |
+          npm run setup:local
+          docker compose up --build --wait
+          docker compose run --rm seed
+          docker compose run --rm seed
+          node --env-file=.env.local scripts/smoke.js
+          docker compose stop mongo
+          node scripts/smoke.js --database-down
+          docker compose up -d --wait mongo
+          node --env-file=.env.local scripts/smoke.js --wait
+      - name: Stop local containers
+        if: always()
+        working-directory: ClothingShopProject
+        run: docker compose down
+      - name: Whitespace check
+        run: |
+          git -C ClothingShopProject diff --check
+          git -C ClothingShopProjectFE diff --check
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: ClothingShopProjectFE/playwright-report/
+          retention-days: 7

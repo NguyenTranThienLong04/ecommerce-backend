@@ -44,8 +44,8 @@ async function updateUser(req,res){
 
     const user = await User.findByIdAndUpdate(
       req.params.id,
-      updateData,
-      { new:true }
+      { $set: updateData, ...(password ? { $inc: { authVersion: 1 } } : {}) },
+      { returnDocument: "after" }
     ).select("-password");
 
     res.json(user);

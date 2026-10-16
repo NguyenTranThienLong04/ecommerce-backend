@@ -4,6 +4,7 @@ const conversationController = require("../controllers/conversation.controller")
 const messageController = require("../controllers/message.controller");
 
 const auth = require("../middlewares/auth.middleware");
+const admin = require("../middlewares/admin.middleware");
 
 router.post(
   "/conversation",
@@ -26,6 +27,7 @@ router.get(
 router.get(
   "/admin/conversations",
   auth,
+  admin,
   conversationController.getAllConversations
 );
 

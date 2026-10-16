@@ -25,7 +25,7 @@ async function updateCategory(req, res) {
     const category = await Category.findByIdAndUpdate(
       req.params.id,
       req.body,
-      { new: true } // trả về dữ liệu sau khi update
+      { returnDocument: "after" } // trả về dữ liệu sau khi update
     );
 
     if (!category) {

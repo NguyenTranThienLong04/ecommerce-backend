@@ -10,6 +10,7 @@ const messageSchema = new mongoose.Schema({
     ref: "User"
   },
   content: String,
+  clientMessageId: String,
   type: {
     type: String,
     enum: ["TEXT", "IMAGE"],
@@ -21,4 +22,10 @@ const messageSchema = new mongoose.Schema({
   }
 }, { timestamps: true });
 
+// A sender's logical send is bound to one immutable conversation and payload.
+// Legacy messages without a client ID are excluded; no destructive backfill.
+messageSchema.index({ idUser: 1, clientMessageId: 1 }, {
+  unique: true, name: "message_sender_client_unique",
+  partialFilterExpression: { clientMessageId: { $type: "string" } }
+});
 module.exports = mongoose.model("Message", messageSchema);

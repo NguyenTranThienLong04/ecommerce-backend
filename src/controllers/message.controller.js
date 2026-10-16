@@ -1,5 +1,6 @@
 const Message = require("../models/Message");
-const Conversation = require("../models/Conversation");
+const sendMessage = require("../services/message.service");
+const { authorizeConversation } = require("../utils/chatAuthorization");
 
 exports.sendMessage = async (req, res) => {
 
@@ -7,30 +8,12 @@ exports.sendMessage = async (req, res) => {
 
     const io = req.app.get("io");
 
-    const userId = req.user.id;
-    const { conversationId, content, type } = req.body;
-
-    let message = await Message.create({
-      idConversation: conversationId,
-      idUser: userId,
-      content,
-      type
-    });
-
-    await Conversation.findByIdAndUpdate(conversationId, {
-      lastMessage: content,
-      lastMessageAt: new Date()
-    });
-
-    message = await message.populate("idUser", "name");
-
-    io.to(conversationId).emit("newMessage", message);
-
+    const { message } = await sendMessage(req.user, req.body, io);
     res.json(message);
 
   } catch (err) {
 
-    res.status(500).json({ message: err.message });
+    res.status(err.status || 500).json({ message: err.status ? err.message : "Lỗi xử lý chat" });
 
   }
 
@@ -40,7 +23,7 @@ exports.getMessages = async (req, res) => {
 
   try {
 
-    const { conversationId } = req.params;
+    const conversationId = await authorizeConversation(req.user, req.params.conversationId);
 
     const messages = await Message.find({
       idConversation: conversationId
@@ -52,7 +35,7 @@ exports.getMessages = async (req, res) => {
 
   } catch (err) {
 
-    res.status(500).json({ message: err.message });
+    res.status(err.status || 500).json({ message: err.status ? err.message : "Lỗi xử lý chat" });
 
   }
 
@@ -62,12 +45,13 @@ exports.markAsRead = async (req, res) => {
 
   try {
 
-    const { conversationId } = req.params;
+    const conversationId = await authorizeConversation(req.user, req.params.conversationId);
 
     await Message.updateMany(
       {
         idConversation: conversationId,
-        isRead: false
+        isRead: false,
+        idUser: { $ne: req.user._id }
       },
       {
         isRead: true
@@ -78,7 +62,7 @@ exports.markAsRead = async (req, res) => {
 
   } catch (err) {
 
-    res.status(500).json({ message: err.message });
+    res.status(err.status || 500).json({ message: err.status ? err.message : "Lỗi xử lý chat" });
 
   }
 
