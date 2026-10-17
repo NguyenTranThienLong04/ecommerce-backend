@@ -24,6 +24,7 @@ module.exports = async function sendMessage(user, body, io) {
     }
     replayed = true;
   }
+  await require("./notification.service").message(message, user);
   if (!replayed) {
     await Conversation.findByIdAndUpdate(conversationId, { lastMessage: content, lastMessageAt: message.createdAt });
   }

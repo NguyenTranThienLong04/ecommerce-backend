@@ -48,6 +48,7 @@ app.use("/api/products",productRoutes);
 app.use("/api/addresses", userAddressRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/chat", chatRoutes);
+app.use("/api/notifications", require("./routes/notification.route"));
 app.use("/api/banners",bannerRoutes);
 app.use("/api/vnpay", (req, res, next) => config.vnpayEnabled ? next()
   : res.status(503).json({ message: "VNPay is disabled in this environment" }), vnpayRoutes);

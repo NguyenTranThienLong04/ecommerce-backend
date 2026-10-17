@@ -43,6 +43,10 @@ adjustments, server-enforced payment capability, idempotent payment-link creatio
 correct completed-order revenue, password-reset session revocation and auth limits.
 Deploy the compatible frontend/backend pair and expect one-time re-login for old JWTs.
 
+[Browser notifications](docs/notifications.md) adds per-user admin/customer inboxes,
+post-commit deduplicated order/payment/chat hooks, and recovery through HTTP snapshots
+on the existing Socket.IO connection. See the document for APIs and delivery limits.
+
 ## Run locally
 
 Requirements: Git, Node **24.13.1** (npm 11), Docker Engine/Desktop with Linux

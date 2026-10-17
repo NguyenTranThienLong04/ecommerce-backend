@@ -1,8 +1,10 @@
 const jwt = require("jsonwebtoken");
 const sendMessage = require("../services/message.service");
 const { authenticateSocket, authorizeConversation } = require("../utils/chatAuthorization");
+const notifications = require("../services/notification.service");
 
 module.exports = (io) => {
+  notifications.attach(io);
   io.use(async (socket, next) => {
     try {
       socket.data.user = await authenticateSocket(socket.handshake.auth?.token);
@@ -28,6 +30,15 @@ module.exports = (io) => {
       else socket.emit("chatError", result);
       if (error.status === 401) socket.disconnect(true);
     }
+
+    socket.on("joinNotifications", async (_payload, ack) => {
+      try {
+        const user = await authenticateSocket(token);
+        for (const name of socket.rooms) if (name.startsWith("notifications:")) await socket.leave(name);
+        await socket.join(notifications.room(user));
+        if (typeof ack === "function") ack({ ok: true });
+      } catch (error) { fail(error, ack); }
+    });
 
     socket.on("joinConversation", async (id, ack) => {
       try {

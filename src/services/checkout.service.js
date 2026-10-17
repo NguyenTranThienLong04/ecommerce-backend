@@ -115,4 +115,8 @@ async function checkout(userId, input, { paymentMethods = ["COD"] } = {}) {
   }
 }
 
-module.exports = checkout;
+module.exports = async (...args) => {
+  const result = await checkout(...args);
+  await require("./notification.service").orderCreated(result.order);
+  return result;
+};

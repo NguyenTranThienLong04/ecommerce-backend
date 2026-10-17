@@ -75,4 +75,8 @@ async function transitionOrder({ orderId, status, actor }) {
   }
 }
 
-module.exports = transitionOrder;
+module.exports = async (...args) => {
+  const result = await transitionOrder(...args);
+  await require("./notification.service").orderUpdated(result.order);
+  return result;
+};

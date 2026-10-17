@@ -104,7 +104,7 @@ async function callbackBinding(result, session) {
 async function processIPN(query) {
   const result = vnpay.verifyCallback(query);
   await ensurePaymentReady();
-  return mongoose.connection.transaction(async session => {
+  const response = await mongoose.connection.transaction(async session => {
     const { attempt, order } = await callbackBinding(result, session);
     if (attempt.status !== "PENDING") {
       if (attempt.resultFingerprint === result.fingerprint) return { RspCode: "02", Message: "Already processed" };
@@ -154,6 +154,8 @@ async function processIPN(query) {
     // FAILED finalizes this attempt only; it never cancels the Order or changes stock.
     return { RspCode: "00", Message: "Result recorded" };
   }, transactionOptions);
+  await require("./notification.service").payment(result.reference);
+  return response;
 }
 
 async function returnLocation(query) {

@@ -1,6 +1,12 @@
 Current commands are in the [main README](../README.md). Batch sections below are
 historical checkpoints; the Batch 7 section supersedes earlier startup limitations.
 
+Notification checkpoint (2026-10-17): **193 backend tests PASS**. The 17 new
+`notification.test.js` cases cover real commit/rollback boundaries, concurrent
+checkout/IPN/message retries, recipient isolation, role revocation, COD/provider
+states, cursor pagination, independent admin read state and socket/HTTP recovery.
+The other 176 regression tests remain enabled. See [notification contract](../docs/notifications.md).
+
 Batch 8 current checkpoint: **149 backend tests**. `hardening.test.js` exercises
 real inventory CAS/checkout/cancellation races, disabled payment capability before
 transaction entry, committed payment response loss and concurrent key uniqueness,
